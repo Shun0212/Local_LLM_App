@@ -1,18 +1,13 @@
-//
-//  Local_LLM_AppApp.swift
-//  Local_LLM_App
-//
-//  Created by Shuu on 2025/08/08.
-//
-
 import SwiftUI
 import SwiftData
 
 @main
 struct Local_LLM_AppApp: App {
+    @StateObject private var config = AppConfig()
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
+            ChatThread.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -25,7 +20,8 @@ struct Local_LLM_AppApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ThreadListView()
+                .environmentObject(config)
         }
         .modelContainer(sharedModelContainer)
     }

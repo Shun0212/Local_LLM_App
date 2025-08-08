@@ -42,3 +42,26 @@ playground.xcworkspace
 
 # VSCode
 .vscode/
+
+server/.venv
+server/server_url_qr.png
+
+# Python artifacts
+__pycache__/
+*.pyc
+.python-version
+
+# Local secrets / env files (do not commit)
+.env
+.env.*
+*.local
+*.pem
+*.key
+*.p12
+*.mobileprovision
+*.keystore
+*.jks
+*.der
+
+# IDEs
+.idea/
