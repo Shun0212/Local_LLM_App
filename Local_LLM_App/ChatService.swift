@@ -10,6 +10,20 @@ struct ChatCompletionResponse: Codable {
     let reply: String
 }
 
+struct ImageGenerationRequest: Codable {
+    let prompt: String
+    let width: Int?
+    let height: Int?
+    let steps: Int?
+}
+
+struct ImageGenerationResponse: Codable {
+    let image: String // data:image/png;base64,...
+    let prompt: String
+    let width: Int
+    let height: Int
+}
+
 enum ChatProvider: String, CaseIterable {
     case ollama
 
@@ -137,6 +151,24 @@ final class ChatService {
             // JSONでなければそのままテキストとして扱う
             onToken(rawLine)
         }
+    }
+
+    func generateImage(_ prompt: String, width: Int = 512, height: Int = 512, steps: Int = 20) async throws -> ImageGenerationResponse {
+        let endpoint = try endpointURL(path: "/generate_image")
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body = ImageGenerationRequest(prompt: prompt, width: width, height: height, steps: steps)
+        request.httpBody = try JSONEncoder().encode(body)
+        
+        let (data, response) = try await urlSession.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            let status = http.statusCode
+            let bodyText = String(data: data, encoding: .utf8) ?? ""
+            throw NSError(domain: "ChatService", code: status, userInfo: [NSLocalizedDescriptionKey: "画像生成エラー: \(status)\n\(bodyText)"])
+        }
+        let decoded = try JSONDecoder().decode(ImageGenerationResponse.self, from: data)
+        return decoded
     }
 
     func checkHealth() async throws -> (status: String, model: String) {

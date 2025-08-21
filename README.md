@@ -16,6 +16,7 @@ An iOS chat app built with SwiftUI that connects to your local LLM server. It su
 ### Features
 - Streaming responses with typing indicator and stop button
 - Clean, centered chat layout with Markdown support
+- **Image generation from text prompts** with visual display in chat
 - Multiple chat threads with auto-title from first user message
 - Server URL setup via QR code scan or manual share
 - Connection status indicator (green/gray/red)
@@ -92,6 +93,11 @@ xcodebuild -scheme Local_LLM_App -sdk iphonesimulator
 4) Chat
 - Type your message and send. Responses stream in real time. Use the stop button to halt generation.
 
+5) Image Generation
+- Type a description of what you want to see and tap the image button (camera icon) to generate an image.
+- Generated images appear in the chat alongside text responses.
+- The feature currently uses placeholder images when AI models are not available, but can be configured to use real AI image generation models like Stable Diffusion.
+
 ### Project Structure (high level)
 - `Local_LLM_App/` iOS app (SwiftUI)
   - SwiftData models: `Item`, `ChatThread`
@@ -138,6 +144,7 @@ SwiftUI で作られた iOS 向けローカル LLM チャットアプリです�
 ### 特長
 - タイピング中インジケーターと停止ボタン付きのストリーミング応答
 - 中央寄せの見やすいチャットレイアウト（Markdown 対応）
+- **テキストプロンプトからの画像生成機能**とチャット内での画像表示
 - 最初のユーザー入力から自動でスレッド名を生成
 - QR コード読み取り／共有でサーバー URL を簡単設定
 - タイトル横の接続状態ドット（緑/灰/赤）
@@ -213,6 +220,11 @@ xcodebuild -scheme Local_LLM_App -sdk iphonesimulator
 
 4) チャット
 - メッセージを送信すると、応答がリアルタイムで流れます。停止ボタンで生成を中断できます。
+
+5) 画像生成
+- 見たいもののテキスト説明を入力し、画像ボタン（カメラアイコン）をタップして画像を生成します。
+- 生成された画像はテキスト応答と一緒にチャットに表示されます。
+- 現在はAIモデルが利用できない場合にプレースホルダー画像を使用しますが、Stable Diffusionなどの実際のAI画像生成モデルを使用するように設定できます。
 
 ### 構成（概要）
 - `Local_LLM_App/` iOS アプリ（SwiftUI）

@@ -29,6 +29,7 @@ struct ContentView: View {
     @State private var usagePrompt: Int? = nil
     @State private var usageCompletion: Int? = nil
     @State private var usageTotal: Int? = nil
+    @State private var isGeneratingImage: Bool = false
 
 
     private let thread: ChatThread
@@ -262,7 +263,40 @@ struct ContentView: View {
 
         // 本文
         let content: AnyView = {
-            if isAssistant {
+            // 画像がある場合の表示
+            if let imageData = item.imageData, !imageData.isEmpty {
+                return AnyView(
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let text = item.text, !text.isEmpty {
+                            Text(text)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .multilineTextAlignment(.leading)
+                                .foregroundColor(isAssistant ? .primary : .white)
+                        }
+                        if let uiImage = base64ToUIImage(imageData) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: min(maxBubbleWidth * 0.8, 300), maxHeight: 300)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .contextMenu {
+                                    Button {
+                                        UIPasteboard.general.image = uiImage
+                                    } label: {
+                                        Label("画像をコピー", systemImage: "doc.on.doc")
+                                    }
+                                    if let text = item.text, !text.isEmpty {
+                                        Button {
+                                            UIPasteboard.general.string = text
+                                        } label: {
+                                            Label("テキストをコピー", systemImage: "doc.on.doc")
+                                        }
+                                    }
+                                }
+                        }
+                    }
+                )
+            } else if isAssistant {
                 return AnyView(
                     markdownText(item.text ?? "")
                         .fixedSize(horizontal: false, vertical: true)
@@ -383,6 +417,7 @@ struct ContentView: View {
     private func stopStreaming() {
         streamTask?.cancel()
         finalizeStreaming(successText: streamingAccumulated)
+        isGeneratingImage = false
     }
 
     // 既定のチャット名かどうか（日本語・英語の両方を許容）
@@ -478,7 +513,18 @@ struct ContentView: View {
     // 入力バー
     @ViewBuilder
     private func inputBar() -> some View {
-        HStack(alignment: .bottom, spacing: 12) {
+        HStack(alignment: .bottom, spacing: 8) {
+            // 画像生成ボタン
+            Button(action: generateImageFromPrompt) {
+                Image(systemName: "photo.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(isGeneratingImage ? .orange : .accentColor)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.accentColor.opacity(0.1)))
+            }
+            .disabled(isGeneratingImage || isSending || messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .accessibilityLabel("画像生成")
+            
             TextField(L10n.t("input_placeholder"), text: $messageText, axis: .vertical)
                 .lineLimit(1...7)
                 .padding(.vertical, 10)
@@ -492,7 +538,7 @@ struct ContentView: View {
                 .focused($inputFocused)
                 .frame(minHeight: 44)
 
-            if isSending {
+            if isSending || isGeneratingImage {
                 Button(action: stopStreaming) {
                     Image(systemName: "stop.fill")
                         .font(.system(size: 22, weight: .semibold))
@@ -518,6 +564,7 @@ struct ContentView: View {
         .padding(.vertical, 10)
         .animation(.easeInOut(duration: 0.2), value: messageText)
         .animation(.easeInOut(duration: 0.25), value: isSending)
+        .animation(.easeInOut(duration: 0.25), value: isGeneratingImage)
     }
 
     // タイトル横の接続状態ドット
@@ -558,6 +605,77 @@ struct ContentView: View {
         } catch {
             await MainActor.run { connectionStatus = .error }
         }
+    }
+    
+    // 画像生成
+    private func generateImageFromPrompt() {
+        guard !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let prompt = messageText
+        
+        // ユーザーメッセージを追加
+        withAnimation {
+            let userItem = Item(timestamp: Date(), text: prompt, role: "user", thread: thread, isImageGeneration: true)
+            modelContext.insert(userItem)
+            messageText = ""
+        }
+        try? modelContext.save()
+        
+        // 触覚フィードバック
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        inputFocused = false
+        
+        // 接続先の確認
+        let targetURL = serverURL ?? config.serverURL
+        guard let serverURL = targetURL else {
+            let sys = Item(timestamp: Date(), text: "サーバーが設定されていません", role: "system")
+            modelContext.insert(sys)
+            return
+        }
+        
+        isGeneratingImage = true
+        
+        Task {
+            do {
+                let svc = ChatService(baseURL: serverURL)
+                let response = try await svc.generateImage(prompt)
+                
+                await MainActor.run {
+                    withAnimation {
+                        let imageItem = Item(
+                            timestamp: Date(),
+                            text: "生成された画像: \(prompt)",
+                            role: "assistant",
+                            thread: thread,
+                            imageData: response.image,
+                            isImageGeneration: true
+                        )
+                        modelContext.insert(imageItem)
+                    }
+                    isGeneratingImage = false
+                }
+            } catch {
+                await MainActor.run {
+                    let errorItem = Item(
+                        timestamp: Date(),
+                        text: "画像生成エラー: \(error.localizedDescription)",
+                        role: "system"
+                    )
+                    modelContext.insert(errorItem)
+                    isGeneratingImage = false
+                }
+            }
+        }
+    }
+    
+    // Base64文字列をUIImageに変換
+    private func base64ToUIImage(_ base64String: String) -> UIImage? {
+        // data:image/png;base64, プレフィックスを除去
+        let cleanedBase64 = base64String.replacingOccurrences(of: "data:image/png;base64,", with: "")
+            .replacingOccurrences(of: "data:image/jpeg;base64,", with: "")
+            .replacingOccurrences(of: "data:image/jpg;base64,", with: "")
+        
+        guard let data = Data(base64Encoded: cleanedBase64) else { return nil }
+        return UIImage(data: data)
     }
 }
 

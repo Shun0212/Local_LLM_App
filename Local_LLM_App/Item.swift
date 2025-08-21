@@ -9,11 +9,16 @@ final class Item {
     var role: String
     // スレッド関連
     var thread: ChatThread?
+    // 画像データ（base64エンコード）
+    var imageData: String?
+    var isImageGeneration: Bool = false
 
-    init(timestamp: Date, text: String? = nil, role: String = "user", thread: ChatThread? = nil) {
+    init(timestamp: Date, text: String? = nil, role: String = "user", thread: ChatThread? = nil, imageData: String? = nil, isImageGeneration: Bool = false) {
         self.timestamp = timestamp
         self.text = text
         self.role = role
         self.thread = thread
+        self.imageData = imageData
+        self.isImageGeneration = isImageGeneration
     }
 }
